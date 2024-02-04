@@ -5,7 +5,7 @@ import {
 } from "poker-tools";
 import {player, type PlayerAction} from "./types/players";
 import type {Bets, GameConfigType, Pots, Seat} from "./types/gameTypes";
-import type {Card, IInjections, IWinners, PlayerId} from "./types/default.type";
+import {type Card, type IInjections, type IWinners, PlayerActionType, type PlayerId} from "./types/default.type";
 import {vi} from "vitest";
 
 // Готовая функция для перемешивания колоды
@@ -71,6 +71,8 @@ export interface HandInterface {
     };
 
     start(): void;
+    setCardDeck(): void;
+    checkingContinueBetting(): boolean;
 
     // Генерирует исключение если игрок пробует походить не  в свой ход
     act(playerId: PlayerId, action: PlayerAction): void;
@@ -78,7 +80,10 @@ export interface HandInterface {
     isValidBet(playerId: PlayerId, amount: number): boolean;
 
     getSeatByPlayerId(playerId: PlayerId): Seat | undefined;
-    setBetByPlayerId(playerId: PlayerId, amount: number): void;
+
+    setBetByPlayerId(seat: Seat, amount: number): void;
+
+    increaceBetByPlayerId(playerId: PlayerId, amount: number): void;
 }
 
 
@@ -106,6 +111,8 @@ const makeHand = (s: ReturnType<typeof player>[],
 }
 
 export class Hand implements HandInterface {
+    _packedDeck: Card[] = [];
+
     _communityCards: Card[] = [];
     _holeCards: Record<PlayerId, [Card, Card]> = {};
     _pots: Pots = [];
@@ -117,6 +124,8 @@ export class Hand implements HandInterface {
     _gameConfig: GameConfigType;
     _injections: IInjections
 
+    _isContinueBetting = false;
+    _maxBet = 0;
     constructor(
         // Игроки за столом. Первый игрок - дилер
         // Можете считать что у всех игроков есть хотя бы 1 фишка
@@ -141,9 +150,6 @@ export class Hand implements HandInterface {
         }
     }
 
-    act(playerId: PlayerId, action: PlayerAction): void {
-    }
-
     getSeatByPlayerId(playerId: PlayerId): Seat | undefined {
         if (!playerId) {
             return undefined;
@@ -151,22 +157,73 @@ export class Hand implements HandInterface {
 
     }
 
-    setBetByPlayerId(playerId: PlayerId, amount: number): void {
-      if(playerId === "a") {
-          return;
-      }
-
-        if(playerId === "b") {
+    setBetByPlayerId({playerId, stack}: Seat, index: number): void {
+        if (index === 0) {
+            return;
+        }
+        if (index === 1) {
             this._bets[playerId] = 10;
             return;
         }
-        if(playerId === "c") {
+        if (index === 2) {
             this._bets[playerId] = 20;
             return
         }
 
-        this._bets[playerId] = amount;
+        this._bets[playerId] = stack;
     }
+
+    setCardDeck(): void {
+        if (this._communityCards.length === 0) {
+            this._communityCards = this._packedDeck.slice(0, 3)
+        }else {
+            this._communityCards = this._packedDeck.slice(0, 1)
+        }
+    }
+
+    checkingContinueBetting(): boolean {
+        for(const key in this._bets) {
+            if(this._bets[key]! < this._maxBet) {
+                return true
+            }
+        }
+        return false
+    }
+
+    increaceBetByPlayerId(playerId: PlayerId, amount: number): void {
+        if(!this._bets[playerId]) {
+            this._bets[playerId] = 0;
+        }
+
+        this._bets[playerId] += amount
+
+        this._maxBet = Math.max(this._maxBet, this._bets[playerId]!);
+    }
+
+    removePlayerWithBets(playerId: PlayerId) {
+        delete this._bets[playerId];
+    }
+
+    act(playerId: PlayerId, action: PlayerAction): void {
+        if (action.type === PlayerActionType.BET) {
+            this.increaceBetByPlayerId(playerId, action.amount);
+        }
+
+        if (action.type === PlayerActionType.FOLD) {
+            this.removePlayerWithBets(playerId)
+            return
+        }
+
+        if(playerId === this._seats?.[this._seats.length - 1]!.playerId) {
+          const isContinueBetting =  this.checkingContinueBetting()
+            if(!isContinueBetting) {
+                this.setCardDeck();
+            }
+        }
+
+        sleep(1000)
+    }
+
 
     isValidBet(playerId: PlayerId, amount: number): boolean {
         if (amount < 0) {
@@ -177,10 +234,10 @@ export class Hand implements HandInterface {
     }
 
     start(): void {
-        generateNewDeck();
+        this._packedDeck = generateNewDeck();
 
-        this._seats.forEach((seat: Seat) => {
-            this.setBetByPlayerId(seat.playerId, seat.stack);
+        this._seats.forEach((seat: Seat, index) => {
+            this.setBetByPlayerId(seat, index);
         })
     }
 

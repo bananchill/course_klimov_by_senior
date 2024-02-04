@@ -18,9 +18,22 @@ interface IInjections {
     givePots?: (winners: IWinners) => void;
 }
 
+
+enum PlayerActionType {
+    FOLD = "fold",
+    BET = "bet",
+    RAISE = "raise",
+    CALL = "call",
+    ALL_IN = "all_in",
+    CHECK = "check",
+}
 export type {
     Card,
     PlayerId,
     IInjections,
-    IWinners
+    IWinners,
+}
+
+export {
+    PlayerActionType
 }
