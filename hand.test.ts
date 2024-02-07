@@ -89,7 +89,7 @@ test("invalid raise", async () => {
 });
 
 test("skipping SB due to all-in", async () => {
-  const { hand } = await makeHand([player("a", 15), player("b"), player("c")]);
+  const { hand } = await makeHand([player("a", 15), player("b", 15), player("c")]);
 
   await act(hand, "a", { type: "bet", amount: 15 });
   await act(hand, "b", { type: "bet", amount: 5 });
@@ -106,6 +106,7 @@ test("pot-sized raises", async () => {
   await act(hand, "b", { type: "bet", amount: 50 });
 
   // A raised from 20 (BB) to 60, so minimum raise is 60-20 = 40 over 60
+  console.log(hand.isValidBet("c", 79), 33333)
   expect(hand.isValidBet("c", 79)).toBe(false);
   expect(hand.isValidBet("c", 80)).toBe(true);
 });
