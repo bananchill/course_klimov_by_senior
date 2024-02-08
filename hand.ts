@@ -132,9 +132,18 @@ export class Hand implements HandInterface {
         winners.playerIds.forEach((playerId) => {
             if (pot - summWinning > 0) {
                 pot -= summWinning;
-                this.seats[playerId].stack += summWinning;
+                this.seats.forEach((seat) => {
+                    if (seat.playerId === playerId) {
+                        seat.stack += summWinning
+                    }
+                })
             } else {
-                this.seats[playerId].stack += pot;
+                this.seats.forEach((seat) => {
+                    if (seat.playerId === playerId) {
+                        seat.stack += pot
+                    }
+                })
+
             }
 
         })
@@ -163,10 +172,10 @@ export class Hand implements HandInterface {
     ) {
         this.seats = seats;
         this.gameConfig = gameConfig;
-        this.deck = (injections.makeDeck || generateNewDeck)(),
-            this.sleep = injections.sleep || sleep,
-            this.givePots = injections.givePots || this.givePots,
-            this.communityCards = [];
+        this.deck = (injections.makeDeck || generateNewDeck)();
+        this.sleep = injections.sleep || sleep;
+        this.givePots = injections.givePots || this.givePots;
+        this.communityCards = [];
         this.holeCards = {};
         this.pots = [{
             potId: "0",
@@ -205,7 +214,26 @@ export class Hand implements HandInterface {
         this.seats.forEach((seat) => {
             this.holeCards[seat.playerId] = [this.getNextCardFromDeck(), this.getNextCardFromDeck()]
         })
+
+        if (this.gameConfig.antes > 0) {
+            this.setAntesBet()
+        }
+
         this.startRound()
+    }
+
+    setAntesBet() {
+        for (let i = 0; i < this.seats.length; i++) {
+            const currentStackPlayer = this.seats[i].stack
+            if (!this.bets[this.seats[i].playerId] && currentStackPlayer >= this.gameConfig.antes) {
+                this.bets[this.seats[i].playerId] = this.gameConfig.antes
+                this.seats[i].stack -= this.gameConfig.antes
+            } else if (!!currentStackPlayer && currentStackPlayer < this.gameConfig.antes) {
+                this.bets[this.seats[i].playerId] = this.seats[i].stack
+                this.seats[i].stack -= this.seats[i].stack
+            }
+
+        }
     }
 
     act(playerId: PlayerId, action: PlayerAction) {
@@ -220,6 +248,7 @@ export class Hand implements HandInterface {
         } else {
             this.placeBet(playerId, action.amount)
         }
+
     }
 
     isValidBet(playerId: PlayerId, amount: number) {
@@ -257,9 +286,11 @@ export class Hand implements HandInterface {
         if (seat === undefined) {
             throw new Error("Player not found");
         }
-        if (seat.stack < amountToBet) {
-            amountToBet = seat.stack;
+
+        if (amount > seat.stack) {
+            return
         }
+
         const nextBet = this.getPlayerBet(playerId) + amountToBet;
         this.bets[playerId] = nextBet;
         seat.stack -= amountToBet;
